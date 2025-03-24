@@ -1,4 +1,3 @@
-// src/components/Registration.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast, ToastContainer } from 'react-toastify';
@@ -23,6 +22,7 @@ const App = () => {
   });
   const [editingId, setEditingId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   
   const skillOptions = ['JavaScript', 'React', 'Node.js', 'MySQL', 'Python', 'Java', 'AWS', 'Docker'];
 
@@ -69,6 +69,14 @@ const App = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePasswordFocus = () => {
+    setIsPasswordFocused(true);
+  };
+
+  const handlePasswordBlur = () => {
+    setIsPasswordFocused(false);
   };
 
   const handleSkillChange = (skill) => {
@@ -222,13 +230,15 @@ const App = () => {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
+                    onFocus={handlePasswordFocus}
+                    onBlur={handlePasswordBlur}
                     required={!editingId}
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     placeholder="••••••••"
                   />
                   
-                  {/* Password validation feedback */}
-                  {(formData.password || !editingId) && (
+                  {/* Password validation feedback - only shown when focused */}
+                  {isPasswordFocused && (
                     <div className="mt-2 space-y-1 text-xs">
                       <p className={passwordValidation.minLength ? "text-green-600" : "text-red-600"}>
                         {passwordValidation.minLength ? "✓" : "✗"} At least 8 characters
