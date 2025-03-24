@@ -26,11 +26,31 @@ const pool = mysql.createPool({
 
 console.log('Database connection configured');
 
+// Enhanced password validation
+const passwordValidation = body('password')
+  .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+  .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+  .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
+  .matches(/[0-9]/).withMessage('Password must contain at least one number')
+  .matches(/[!@#$%^&*(),.?":{}|<>]/).withMessage('Password must contain at least one special character');
+
 // Validation middleware
 const validateUser = [
   body('name').trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
   body('email').isEmail().withMessage('Invalid email address'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters').optional({ nullable: true, checkFalsy: true }),
+  // Use different validations for create vs update
+  body('password').custom((value, { req }) => {
+    // Skip validation if updating user and password is empty
+    if (req.method === 'PUT' && (!value || value.trim() === '')) {
+      return true;
+    }
+    
+    // Otherwise run full validation
+    const result = passwordValidation.run(req);
+    return result.then(() => true).catch(error => {
+      throw new Error(error.msg);
+    });
+  }),
   body('role').isIn(['user', 'admin', 'developer']).withMessage('Invalid role'),
   body('phone').optional().matches(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/).withMessage('Invalid phone number format'),
   body('skills').isArray().withMessage('Skills must be an array')
@@ -125,8 +145,9 @@ app.post('/api/users', validateUser, async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
     
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Hash password with higher cost factor (12) for better security
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(password, salt);
     
     // Insert user
     const [result] = await pool.execute(
@@ -177,9 +198,11 @@ app.put('/api/users/:id', validateUser, async (req, res) => {
     }
     
     // Update user
-    if (password) {
-      // If password is provided, hash it
-      const hashedPassword = await bcrypt.hash(password, 10);
+    if (password && password.trim() !== '') {
+      // If password is provided, hash it with higher cost factor
+      const salt = await bcrypt.genSalt(12);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      
       await pool.execute(
         'UPDATE users SET name = ?, email = ?, password = ?, phone = ?, role = ?, skills = ? WHERE id = ?',
         [name, email, hashedPassword, phone, role, JSON.stringify(skills || []), userId]

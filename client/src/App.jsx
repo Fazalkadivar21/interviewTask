@@ -14,6 +14,13 @@ const App = () => {
     role: 'user',
     skills: []
   });
+  const [passwordValidation, setPasswordValidation] = useState({
+    minLength: false,
+    hasUppercase: false,
+    hasLowercase: false,
+    hasNumber: false,
+    hasSpecial: false
+  });
   const [editingId, setEditingId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -22,6 +29,29 @@ const App = () => {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    // Validate password whenever it changes
+    validatePassword(formData.password);
+  }, [formData.password]);
+
+  const validatePassword = (password) => {
+    setPasswordValidation({
+      minLength: password.length >= 8,
+      hasUppercase: /[A-Z]/.test(password),
+      hasLowercase: /[a-z]/.test(password),
+      hasNumber: /[0-9]/.test(password),
+      hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    });
+  };
+
+  const isPasswordValid = () => {
+    // No validation needed for editing if password field is empty
+    if (editingId && !formData.password) return true;
+    
+    // All validation criteria must be met
+    return Object.values(passwordValidation).every(criteria => criteria === true);
+  };
 
   const fetchUsers = async () => {
     try {
@@ -52,6 +82,15 @@ const App = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate password if required (for new users or if password is provided)
+    if (!editingId || formData.password) {
+      if (!isPasswordValid()) {
+        toast.error('Please ensure your password meets all security requirements');
+        return;
+      }
+    }
+    
     setIsLoading(true);
 
     try {
@@ -74,7 +113,10 @@ const App = () => {
       setEditingId(null);
       fetchUsers();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Operation failed');
+      const errorMessage = error.response?.data?.errors?.[0]?.msg || 
+                          error.response?.data?.message || 
+                          'Operation failed';
+      toast.error(errorMessage);
       console.error('Error:', error);
     } finally {
       setIsLoading(false);
@@ -184,6 +226,27 @@ const App = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     placeholder="••••••••"
                   />
+                  
+                  {/* Password validation feedback */}
+                  {(formData.password || !editingId) && (
+                    <div className="mt-2 space-y-1 text-xs">
+                      <p className={passwordValidation.minLength ? "text-green-600" : "text-red-600"}>
+                        {passwordValidation.minLength ? "✓" : "✗"} At least 8 characters
+                      </p>
+                      <p className={passwordValidation.hasUppercase ? "text-green-600" : "text-red-600"}>
+                        {passwordValidation.hasUppercase ? "✓" : "✗"} At least one uppercase letter
+                      </p>
+                      <p className={passwordValidation.hasLowercase ? "text-green-600" : "text-red-600"}>
+                        {passwordValidation.hasLowercase ? "✓" : "✗"} At least one lowercase letter
+                      </p>
+                      <p className={passwordValidation.hasNumber ? "text-green-600" : "text-red-600"}>
+                        {passwordValidation.hasNumber ? "✓" : "✗"} At least one number
+                      </p>
+                      <p className={passwordValidation.hasSpecial ? "text-green-600" : "text-red-600"}>
+                        {passwordValidation.hasSpecial ? "✓" : "✗"} At least one special character
+                      </p>
+                    </div>
+                  )}
                 </div>
                 
                 <div>
@@ -245,7 +308,7 @@ const App = () => {
                       <button
                         type="submit"
                         className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                        disabled={isLoading}
+                        disabled={isLoading || (formData.password && !isPasswordValid())}
                       >
                         Update User
                       </button>
@@ -254,7 +317,7 @@ const App = () => {
                     <button
                       type="submit"
                       className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                      disabled={isLoading}
+                      disabled={isLoading || !isPasswordValid()}
                     >
                       Register
                     </button>
